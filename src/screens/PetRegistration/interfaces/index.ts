@@ -1,29 +1,3 @@
-export interface PhotoComponentProps {
-	imageUri: string
-	onChangeData: (imageUri: string) => void
-}
-
-interface petHealth {
-	castrated: boolean
-	dewormed: boolean
-	diseases: string
-	sick: boolean
-	vaccinated: boolean
-}
-
-export interface followUpVisitsPreferences {
-	oneMonth: boolean
-	sixMonths: boolean
-	threeMonths: boolean
-}
-
-export interface adoptionPreferences {
-	adoptionTerm: boolean
-	followUpVisits: followUpVisitsPreferences
-	housePhotos: boolean
-	testVisit: boolean
-}
-
 export interface TemperamentType {
 	Brincalhão: boolean
 	Tímido: boolean
@@ -46,7 +20,48 @@ export interface CommonData {
 	diseases: string
 }
 
+interface petHealth {
+	castrated: boolean
+	dewormed: boolean
+	diseases: string
+	sick: boolean
+	vaccinated: boolean
+}
+
+interface financialPreferences {
+	food: boolean
+	health: boolean
+	toys: boolean
+}
+
+interface sponsorshipPreferences {
+	financial: financialPreferences
+	sponsorshipTerm: boolean
+	visits: boolean
+}
+
+interface helpPreferences {
+	financial: boolean
+	food: boolean
+	medicine: [string]
+	toys: [string]
+}
+
+export interface followUpVisitsPreferences {
+	oneMonth: boolean
+	sixMonths: boolean
+	threeMonths: boolean
+}
+
+export interface adoptionPreferences {
+	adoptionTerm: boolean
+	followUpVisits: followUpVisitsPreferences
+	housePhotos: boolean
+	testVisit: boolean
+}
+
 export interface IRegisterPet {
+	id?: string
 	about: string
 	age_range: string
 	name: string
@@ -57,5 +72,7 @@ export interface IRegisterPet {
 	species: string
 	temper: [string]
 	owner: string
-	adoptionPreferences: adoptionPreferences
+	sponsorshipPreferences?: sponsorshipPreferences
+	helpPreferences?: helpPreferences
+	adoptionPreferences?: adoptionPreferences
 }
