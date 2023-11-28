@@ -1,20 +1,29 @@
+import { MaterialIcons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { doc, getDoc } from 'firebase/firestore'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { PetInfoProps } from 'routes/types'
+import MainButton from '../../components/MainButton'
+import { PetData } from '../../components/PetList'
+import { AuthContext } from '../../context/Auth'
+import { NotificationsContext } from '../../context/Notifications'
 import { db } from '../../services/firebase'
-import { PetData } from '../Adopt'
 import PetPhoto from './components/PetPhoto'
 import { serviceNotifyPetOwner } from './services'
-import { MaterialIcons } from '@expo/vector-icons'
-import MainButton from '../../components/MainButton'
 
 const PetInfo = ({ route }: PetInfoProps) => {
+	const { user } = useContext(AuthContext)
+	const { expoPushToken, sendPushNotification } = useContext(NotificationsContext)
+	const owner = route.params.pet.owner
 	const [loading, setLoading] = useState(false)
 	const petParam = route.params.pet
 	const [petInfo, setPetInfo] = useState<PetData>({} as PetData)
-	const [adoptionRequirements, setAdoptionRequirements] = useState<string | undefined>('')
+	const [adoptionRequirements, setAdoptionRequirements] = useState<string | undefined>(undefined)
+	const subtTitleStyle = {
+		...styles.subTitle,
+		color: owner ? '#589b9b' : '#f7a800',
+	}
 
 	// fetchData
 	useFocusEffect(
@@ -34,6 +43,7 @@ const PetInfo = ({ route }: PetInfoProps) => {
 		try {
 			const data = await getDoc(doc(db, 'pet', petParam.id))
 			const petData = { id: data.id, ...data.data() } as PetData
+			console.log('owner id: ', petData.owner)
 			setPetInfo(petData)
 			console.log('pet temperamento: ', petInfo.temper)
 		} catch (error) {
@@ -43,6 +53,10 @@ const PetInfo = ({ route }: PetInfoProps) => {
 		}
 	}
 
+	// const handleSendAdoptionNotification = () => {
+	// 	sendPushNotification({ to: owner.expoToken || '', from: expoPushToken })
+	// }
+
 	const arrayToString = (temp: string[] | undefined): string | undefined => {
 		if (!temp || temp.length < 1) return
 		if (temp.length === 1) return temp[0]
@@ -50,7 +64,6 @@ const PetInfo = ({ route }: PetInfoProps) => {
 		const tempConcat = temp.join(', ') + ' e ' + lastWord
 		return tempConcat
 	}
-
 	const configRequirements = () => {
 		const array = []
 		if (petInfo.adoptionPreferences?.adoptionTerm) array.push('Termo de ação')
@@ -67,8 +80,13 @@ const PetInfo = ({ route }: PetInfoProps) => {
 		setAdoptionRequirements(arrayToString(array))
 	}
 
-	const registerAdoptionRequest = () => {
-		serviceNotifyPetOwner(petInfo.owner);
+	const registerAdoptionRequest = async () => {
+		try {
+			const res = await serviceNotifyPetOwner(petInfo.owner, expoPushToken, user, petInfo.name)
+			console.log('res: ', res)
+		} catch (error) {
+			console.error(error)
+		}
 	}
 
 	if (loading) {
@@ -85,83 +103,117 @@ const PetInfo = ({ route }: PetInfoProps) => {
 				<PetPhoto petId={petInfo.id} />
 			</View>
 			<View style={styles.container}>
-				<FavoriteButton />
+				{owner ? <EditButton /> : <FavoriteButton />}
+
 				<ScrollView>
 					<Text style={styles.title}>{petInfo.name}</Text>
 					<View style={styles.section_3}>
 						<View>
-							<Text style={styles.subTitle}>SEXO</Text>
+							<Text style={subtTitleStyle}>SEXO</Text>
 							<Text style={styles.fontDefault}>{petInfo.sex}</Text>
 						</View>
 						<View>
-							<Text style={styles.subTitle}>PORTE</Text>
+							<Text style={subtTitleStyle}>PORTE</Text>
 							<Text style={styles.fontDefault}>{petInfo.size}</Text>
 						</View>
 						<View>
-							<Text style={styles.subTitle}>IDADE</Text>
+							<Text style={subtTitleStyle}>IDADE</Text>
 							<Text style={styles.fontDefault}>{petInfo.age_range}</Text>
 						</View>
 					</View>
 
 					<View style={[styles.section_2, { marginTop: 16 }]}>
 						<View>
-							<Text style={styles.subTitle}>LOCALIZAÇÃO</Text>
-							<Text style={styles.fontDefault}>ADICIONAR NO BANCO</Text>
+							<Text style={subtTitleStyle}>LOCALIZAÇÃO</Text>
+							<Text style={styles.fontDefault}>{petInfo?.location}</Text>
 						</View>
 					</View>
 					<View style={styles.break}></View>
 					<View style={[styles.section_2]}>
 						<View>
-							<Text style={styles.subTitle}>CASTRADO</Text>
+							<Text style={subtTitleStyle}>CASTRADO</Text>
 							<Text style={styles.fontDefault}>{petInfo.petHealth?.castrated ? 'Sim' : 'Não'}</Text>
 						</View>
 						<View>
-							<Text style={styles.subTitle}>VERMIFUGADO</Text>
+							<Text style={subtTitleStyle}>VERMIFUGADO</Text>
 							<Text style={styles.fontDefault}>{petInfo.petHealth?.dewormed ? 'Sim' : 'Não'}</Text>
 						</View>
 					</View>
 
 					<View style={[styles.section_2, { marginTop: 16 }]}>
 						<View>
-							<Text style={styles.subTitle}>VACINADO</Text>
+							<Text style={subtTitleStyle}>VACINADO</Text>
 							<Text style={styles.fontDefault}>
 								{petInfo.petHealth?.vaccinated ? 'Sim' : 'Não'}
 							</Text>
 						</View>
 						<View>
-							<Text style={styles.subTitle}>DOENÇAS</Text>
-							<Text style={styles.fontDefault}>TEM QUE SER ARRAY</Text>
+							<Text style={subtTitleStyle}>DOENÇAS</Text>
+							{petInfo?.petHealth?.diseases?.length === 0 ? (
+								<Text style={styles.fontDefault}>Nenhuma</Text>
+							) : (
+								<Text style={styles.fontDefault}>
+									{arrayToString(petInfo?.petHealth?.diseases)}
+								</Text>
+							)}
 						</View>
 					</View>
 					<View style={styles.break}></View>
 					<View style={styles.section_2}>
 						<View>
-							<Text style={styles.subTitle}>TEMPERAMENTO</Text>
+							<Text style={subtTitleStyle}>TEMPERAMENTO</Text>
 							<Text style={styles.fontDefault}>{arrayToString(petInfo.temper)}</Text>
 						</View>
 					</View>
-					<View style={styles.break}></View>
-					<View style={styles.section_2}>
-						<View>
-							<Text style={styles.subTitle}>EXIGÊNCIAS DO DOADOR</Text>
-							<Text style={styles.fontDefault}>{adoptionRequirements}</Text>
-						</View>
-					</View>
+
+					{adoptionRequirements && (
+						<>
+							<View style={styles.break}></View>
+							<Text style={subtTitleStyle}>EXIGÊNCIAS DO DOADOR</Text>
+							<View style={styles.section_2}>
+								<Text style={styles.fontDefault}>{adoptionRequirements}</Text>
+							</View>
+						</>
+					)}
+
 					<View style={styles.break}></View>
 					<View style={[styles.section_2, { marginBottom: 28 }]}>
 						<View>
-							<Text style={styles.subTitle}>MAIS SOBRE {petInfo?.name?.toUpperCase()}</Text>
+							<Text style={subtTitleStyle}>MAIS SOBRE {petInfo?.name?.toUpperCase()}</Text>
 							<Text style={styles.fontDefault}>{petInfo.about}</Text>
 						</View>
 					</View>
-					<View style={styles.mainButton}>
-						<MainButton
-							text={'PRETENDO ADOTAR'}
-							styleButton={{ backgroundColor: '#fdcf58' }}
-							styleText={{ color: '#434343' }}
-							onPress={() => console.log('Pretendo adotar botão')}
-						/>
-					</View>
+					{!owner ? (
+						<View style={styles.mainButton}>
+							<MainButton
+								text={'PRETENDO ADOTAR'}
+								styleButton={{ backgroundColor: '#fdcf58' }}
+								styleText={{ color: '#434343' }}
+								onPress={() => registerAdoptionRequest()}
+							/>
+						</View>
+					) : (
+						<View
+							style={{
+								flex: 1,
+								flexDirection: 'row',
+								justifyContent: 'space-around',
+							}}
+						>
+							<MainButton
+								text={'VER INTERESSADOS'}
+								styleButton={{ backgroundColor: '#88c9bf', width: '40%' }}
+								styleText={{ color: '#434343' }}
+								onPress={() => console.log('VER INTERESSADOS')}
+							/>
+							<MainButton
+								text={'REMOVER PET'}
+								styleButton={{ backgroundColor: '#88c9bf', width: '40%' }}
+								styleText={{ color: '#434343' }}
+								onPress={() => console.log('REMOVER PET')}
+							/>
+						</View>
+					)}
 				</ScrollView>
 			</View>
 		</View>
@@ -172,6 +224,14 @@ const FavoriteButton = () => {
 	return (
 		<View style={styles.favoriteButton}>
 			<MaterialIcons name='favorite-border' size={24} color='#434343' />
+		</View>
+	)
+}
+
+const EditButton = () => {
+	return (
+		<View style={styles.favoriteButton}>
+			<MaterialIcons name='edit' size={24} color='#434343' />
 		</View>
 	)
 }
