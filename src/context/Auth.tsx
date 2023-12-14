@@ -4,7 +4,7 @@ import { ref, uploadBytes } from 'firebase/storage'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { IRegisterUser } from 'screens/UserRegister/interfaces'
 import { auth, db, storage } from '../services/firebase'
-import { NotificationsContext } from './Notifications'
+import { AppContext, AppContextType } from './Global'
 
 export type TUser = {
 	full_name?: string
@@ -48,9 +48,55 @@ async function uploadImageToFirebase(userData: IRegisterUser, userUid: string) {
 }
 
 const AuthProvider = ({ children }: any) => {
-	const { expoPushToken } = useContext(NotificationsContext)
+	// const { expoPushToken } = useContext(NotificationsContext)
+	const { state, dispatch } = useContext<AppContextType>(AppContext)
 	const [user, setUser] = useState<TUser>({ signed: false, user_uid: '' })
 	const [loading, setLoading] = useState(false)
+	// const { notificationPending, setNotificationPending } = useNotifications(
+	// 	user.signed,
+	// 	user.user_uid
+	// )
+
+	useEffect(() => {
+		const subscribe = auth.onAuthStateChanged(async (userAuth) => {
+			if (userAuth) {
+				setLoading(true)
+				await getUserFromDB(userAuth.uid)
+				setLoading(false)
+			} else {
+				signout()
+			}
+		})
+		return subscribe
+	}, [])
+
+	// update database expoToken
+	useEffect(() => {
+		const updateExpoToken = async () => {
+			if (state.expoNotificationToken && user.user_uid) {
+				await updateDoc(doc(db, 'users', user.user_uid), {
+					expoToken: state.expoNotificationToken,
+				})
+			}
+		}
+		updateExpoToken()
+	}, [state.expoNotificationToken, user.user_uid])
+
+	const getUserFromDB = async (user_uid: string) => {
+		try {
+			await getDoc(doc(db, 'users', user_uid)).then((fetched_data) => {
+				const user_data = fetched_data.data()
+				setUser({ ...user_data, user_uid: user_uid, signed: true })
+			})
+			// handleNotificationPending()
+			// await updateDoc(doc(db, 'users', user_uid), {
+			// 	expoToken: expoPushToken,
+			// })
+			dispatch({ type: 'SET_USER_SIGNED_IN', payload: true })
+		} catch (error) {
+			console.warn(error)
+		}
+	}
 
 	useEffect(() => {
 		const subscribe = auth.onAuthStateChanged(async (userAuth) => {
@@ -108,6 +154,7 @@ const AuthProvider = ({ children }: any) => {
 		}
 		auth.signOut().catch((error) => console.warn(error.message))
 		setUser({ signed: false, user_uid: '' })
+		dispatch({ type: 'SET_USER_SIGNED_IN', payload: false })
 		setLoading(false)
 	}
 
@@ -123,7 +170,8 @@ const AuthProvider = ({ children }: any) => {
 				state: userData.uf,
 				city: userData.city,
 				address: userData.street,
-				expoToken: expoPushToken,
+				// expoToken: expoPushToken,
+				expoToken: '',
 			}
 
 			const authResult = await createUserWithEmailAndPassword(
