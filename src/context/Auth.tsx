@@ -98,6 +98,42 @@ const AuthProvider = ({ children }: any) => {
 		}
 	}
 
+	useEffect(() => {
+		const subscribe = auth.onAuthStateChanged(async (userAuth) => {
+			if (userAuth) {
+				setLoading(true)
+				await getUserFromDB(userAuth.uid)
+				setLoading(false)
+			} else {
+				signout()
+			}
+		})
+		return subscribe
+	}, [])
+
+	// update database expoToken
+	useEffect(() => {
+		const updateExpoToken = async () => {
+			if (expoPushToken && user.user_uid) {
+				await updateDoc(doc(db, 'users', user.user_uid), {
+					expoToken: expoPushToken,
+				})
+			}
+		}
+		updateExpoToken()
+	}, [expoPushToken, user.user_uid])
+
+	const getUserFromDB = async (user_uid: string) => {
+		try {
+			await getDoc(doc(db, 'users', user_uid)).then((fetched_data) => {
+				const user_data = fetched_data.data()
+				setUser({ ...user_data, user_uid: user_uid, signed: true })
+			})
+		} catch (error) {
+			console.warn(error)
+		}
+	}
+
 	const signin = async (email: string, password: string) => {
 		setLoading(true)
 		try {
